@@ -32,16 +32,51 @@ function MiniChart({ data, color }) {
   )
 }
 
-const TABS = ['일간', '주간', '월간', '연간']
+const TABS = [
+  { key: 'daily', label: '일간' },
+  { key: 'weekly', label: '주간' },
+  { key: 'monthly', label: '월간' },
+  { key: 'yearly', label: '연간' },
+]
 
-export default function SectorDetail({ sectorId, onBack, tabBar }) {
+const FAV_KEY = 'hi_fav_sectors'
+
+function getFavs() {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]') } catch { return [] }
+}
+
+export default function SectorDetail({ sectorId, onBack, onOpenNews, tabBar }) {
   const [data, setData] = useState(null)
-  const [tab, setTab] = useState('일간')
+  const [period, setPeriod] = useState('daily')
+  const [fav, setFav] = useState(() => getFavs().includes(sectorId))
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
     setData(null)
-    fetch(`/api/sectors/${sectorId}`).then((r) => r.json()).then(setData)
-  }, [sectorId])
+    fetch(`/api/sectors/${sectorId}?period=${period}`).then((r) => r.json()).then(setData)
+  }, [sectorId, period])
+
+  useEffect(() => { setFav(getFavs().includes(sectorId)) }, [sectorId])
+
+  const toggleFav = () => {
+    const cur = getFavs()
+    const next = fav ? cur.filter((x) => x !== sectorId) : [...cur, sectorId]
+    localStorage.setItem(FAV_KEY, JSON.stringify(next))
+    setFav(!fav)
+    setToast(!fav ? '관심 섹터에 추가됨' : '관심 섹터에서 제거됨')
+    setTimeout(() => setToast(null), 1400)
+  }
+
+  const share = async () => {
+    const url = window.location.origin + window.location.pathname + '#sector/' + sectorId
+    try {
+      await navigator.clipboard.writeText(url)
+      setToast('링크 복사됨')
+    } catch {
+      setToast('복사 실패')
+    }
+    setTimeout(() => setToast(null), 1400)
+  }
 
   if (!data) {
     return (
@@ -52,7 +87,7 @@ export default function SectorDetail({ sectorId, onBack, tabBar }) {
   }
 
   const up = data.change >= 0
-  const color = up ? '#ef4444' : '#2563eb'
+  const color = up ? 'var(--up)' : 'var(--down)'
 
   return (
     <PhoneFrame tabBar={tabBar}>
@@ -62,12 +97,18 @@ export default function SectorDetail({ sectorId, onBack, tabBar }) {
         </button>
         <div className="detail-title">
           {data.name}
-          <span style={{ color: data.starred ? '#f59e0b' : '#cbd5e1' }}>★</span>
+          <button
+            className="star-btn"
+            onClick={toggleFav}
+            aria-label={fav ? '관심 해제' : '관심 추가'}
+            style={{ color: fav ? '#f59e0b' : 'var(--muted2)' }}
+          >★</button>
         </div>
-        <button className="icon-btn" aria-label="공유">
+        <button className="icon-btn" onClick={share} aria-label="공유">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
         </button>
       </div>
+      {toast && <div className="toast">{toast}</div>}
 
       <div className="scroll">
         <div className="detail-hero">
@@ -75,31 +116,88 @@ export default function SectorDetail({ sectorId, onBack, tabBar }) {
             <span>{up ? '▲' : '▼'}</span>
             {up ? '+' : ''}{data.change.toFixed(2)}%
           </div>
-          <div className="hero-price">{data.price.toLocaleString()} pt</div>
+          <div className="hero-price">
+            {data.price?.toLocaleString()} {data.currency === 'USD' ? '$' : '원'}
+            {data.high_3mo && data.low_3mo && (
+              <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>
+                3M {data.low_3mo.toLocaleString()}~{data.high_3mo.toLocaleString()}
+              </span>
+            )}
+          </div>
           <MiniChart data={data.chart} color={color} />
           <div className="hero-summary">{data.summary}</div>
         </div>
 
         <div className="tabs-pill">
           {TABS.map((t) => (
-            <button key={t} className={`pill ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</button>
+            <button key={t.key} className={`pill ${period === t.key ? 'active' : ''}`} onClick={() => setPeriod(t.key)}>{t.label}</button>
           ))}
         </div>
-
-        <div className="section-title"><span>실시간 코멘트</span><span className="more">정렬 ›</span></div>
-        {data.comments.map((c) => (
-          <div key={c.id} className="comment">
-            <div className="row1">
-              <span className="user">{c.user}</span>
-              <span>{c.time}</span>
-            </div>
-            <div className="text">{c.text}</div>
-            <div className="row2">
-              <span>♡ {c.likes}</span>
-              <span>💬 답글</span>
-            </div>
+        {data.period_label && (
+          <div style={{ fontSize: 10, color: 'var(--muted)', textAlign: 'center', marginBottom: 10, fontWeight: 600 }}>
+            {data.period_label}
           </div>
-        ))}
+        )}
+
+        <div className="section-title">
+          <span>
+            관련 최신 뉴스
+            {data.comments?.length > 0 && data.news_period && (
+              <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginLeft: 6 }}>
+                · {data.news_period}
+              </span>
+            )}
+          </span>
+          {onOpenNews && data.comments?.length > 0 && (
+            <button
+              className="more"
+              style={{ border: 0, background: 'transparent', cursor: 'pointer', color: 'var(--accent)' }}
+              onClick={() => onOpenNews(data.name)}
+            >전체 보기 ›</button>
+          )}
+        </div>
+        {(!data.comments || data.comments.length === 0) && (
+          <div className="empty" style={{ padding: '20px 0' }}>
+            관련 뉴스를 찾지 못했어요
+            {onOpenNews && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  onClick={() => onOpenNews(data.name)}
+                  style={{
+                    border: '1px solid var(--line)',
+                    background: 'var(--card)',
+                    color: 'var(--text)',
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >뉴스탭에서 검색 ›</button>
+              </div>
+            )}
+          </div>
+        )}
+        {data.comments.map((c) => {
+          const isNews = c.kind === 'news'
+          const Wrapper = isNews && c.link ? 'a' : 'div'
+          const props = isNews && c.link ? { href: c.link, target: '_blank', rel: 'noreferrer' } : {}
+          return (
+            <Wrapper key={c.id} className="comment" {...props}>
+              <div className="row1">
+                <span className="user">{c.user}</span>
+                <span>{c.time}</span>
+              </div>
+              <div className="text">{c.text}</div>
+              {!isNews && (
+                <div className="row2">
+                  <span>♡ {c.likes}</span>
+                  <span>💬 답글</span>
+                </div>
+              )}
+            </Wrapper>
+          )
+        })}
       </div>
     </PhoneFrame>
   )

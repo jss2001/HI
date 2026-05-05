@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
 
+const THEMES = [
+  { key: 'light', icon: '☀︎' },
+  { key: 'dark', icon: '☾' },
+  { key: 'green', icon: '⬢' },
+]
+
 function StatusBar() {
   const [time, setTime] = useState('9:41')
   useEffect(() => {
@@ -23,10 +29,34 @@ function StatusBar() {
   )
 }
 
+function ThemeToggle() {
+  const [theme, setTheme] = useState(() =>
+    document.documentElement.getAttribute('data-theme') ||
+    localStorage.getItem('hi_theme') || 'light'
+  )
+  const apply = (t) => {
+    setTheme(t)
+    document.documentElement.setAttribute('data-theme', t)
+    localStorage.setItem('hi_theme', t)
+  }
+  return (
+    <div className="theme-inphone">
+      {THEMES.map((t) => (
+        <button
+          key={t.key}
+          className={`theme-btn ${theme === t.key ? 'on' : ''}`}
+          onClick={() => apply(t.key)}
+        >{t.icon}</button>
+      ))}
+    </div>
+  )
+}
+
 export default function PhoneFrame({ children, tabBar }) {
   return (
     <div className="phone">
       <StatusBar />
+      <ThemeToggle />
       {children}
       {tabBar}
     </div>
