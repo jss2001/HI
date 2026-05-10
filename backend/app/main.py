@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers import (
-    analyst, auth, briefing, news, search, sectors, themes, usage,
+    analyst, auth, briefing, news, search, sectors, themes, usage, exchange
 )
 
 
@@ -56,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(briefing.router)
     app.include_router(analyst.router)
     app.include_router(themes.router)
+    app.include_router(exchange.router)
 
     return app
 

@@ -29,7 +29,7 @@ function StatusBar() {
   )
 }
 
-function ThemeToggle() {
+function TopActions() {
   const [theme, setTheme] = useState(() =>
     document.documentElement.getAttribute('data-theme') ||
     localStorage.getItem('hi_theme') || 'light'
@@ -39,24 +39,33 @@ function ThemeToggle() {
     document.documentElement.setAttribute('data-theme', t)
     localStorage.setItem('hi_theme', t)
   }
+
   return (
-    <div className="theme-inphone">
-      {THEMES.map((t) => (
-        <button
-          key={t.key}
-          className={`theme-btn ${theme === t.key ? 'on' : ''}`}
-          onClick={() => apply(t.key)}
-        >{t.icon}</button>
-      ))}
+    <div className="top-actions">
+      <div className="theme-pill">
+        {THEMES.map((t) => (
+          <button
+            key={t.key}
+            className={`theme-btn ${theme === t.key ? 'on' : ''}`}
+            onClick={() => apply(t.key)}
+          >{t.icon}</button>
+        ))}
+      </div>
+      <button 
+        className="exchange-fab" 
+        onClick={() => window.dispatchEvent(new CustomEvent('hi-nav', { detail: { name: 'exchange' } }))}
+      >
+        $
+      </button>
     </div>
   )
 }
 
-export default function PhoneFrame({ children, tabBar }) {
+export default function PhoneFrame({ children, tabBar, hideTopActions }) {
   return (
     <div className="phone">
       <StatusBar />
-      <ThemeToggle />
+      {!hideTopActions && <TopActions />}
       {children}
       {tabBar}
     </div>

@@ -6,6 +6,7 @@ import SectorDetail from './screens/SectorDetail'
 import NewsTimeline from './screens/NewsTimeline'
 import AnalystScreen from './screens/AnalystScreen'
 import ThemeDetail from './screens/ThemeDetail'
+import ExchangeReport from './screens/ExchangeReport'
 import TabBar from './components/TabBar'
 
 export default function App() {
@@ -16,6 +17,10 @@ export default function App() {
   useEffect(() => {
     const saved = localStorage.getItem('hi_theme') || 'light'
     document.documentElement.setAttribute('data-theme', saved)
+
+    const handleNav = (e) => setView(e.detail)
+    window.addEventListener('hi-nav', handleNav)
+    return () => window.removeEventListener('hi-nav', handleNav)
   }, [])
 
   const handleTab = (key) => {
@@ -62,6 +67,8 @@ export default function App() {
         onOpenNews={(kw) => { setView({ name: 'news', tag: kw }); setTab('news') }}
       />
     )
+  } else if (view.name === 'exchange') {
+    screen = <ExchangeReport tabBar={tabBar} onBack={() => setView({ name: 'home' })} />
   } else {
     screen = <SectorCheck tabBar={tabBar} onOpenSector={(id) => setView({ name: 'detail', sectorId: id })} />
   }
