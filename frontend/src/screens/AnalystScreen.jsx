@@ -55,6 +55,70 @@ const PERSONA = {
   },
 }
 
+function StockSearchInput({ value, onChange, onPick, placeholder, style }) {
+  const [results, setResults] = useState([])
+  const [searching, setSearching] = useState(false)
+  const [open, setOpen] = useState(false)
+  const blurTimer = useRef(null)
+
+  useEffect(() => {
+    const q = (value || '').trim()
+    if (!q) { setResults([]); return }
+    setSearching(true)
+    const h = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+        const j = await r.json()
+        setResults(j.results || [])
+      } catch {} finally { setSearching(false) }
+    }, 200)
+    return () => clearTimeout(h)
+  }, [value])
+
+  return (
+    <div className="search-suggest-wrap" style={style}>
+      <input
+        className="search-input"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => { blurTimer.current = setTimeout(() => setOpen(false), 150) }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && open && results[0]) {
+            e.preventDefault()
+            onPick(results[0])
+            setOpen(false)
+          }
+        }}
+      />
+      {open && results.length > 0 && (
+        <div className="search-suggest">
+          {results.map((r) => (
+            <div
+              key={r.stock_code}
+              className="search-suggest-row"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                clearTimeout(blurTimer.current)
+                onPick(r)
+                setOpen(false)
+              }}
+            >
+              <span className="search-suggest-name">{r.corp_name}</span>
+              <span className="search-suggest-code">{r.stock_code}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {open && searching && results.length === 0 && value && (
+        <div className="search-suggest-loading">검색 중…</div>
+      )}
+    </div>
+  )
+}
+
+
 function ThreadPost({ kind, children, last }) {
   const p = PERSONA[kind]
   const icons = {
@@ -245,18 +309,18 @@ export default function AnalystScreen({ tabBar }) {
 
         <form onSubmit={handleSubmit} style={{ marginBottom: 10 }}>
           <div className="search-row">
-            <input
-              className="search-input"
-              placeholder={mode === 'compare' ? '종목 A' : '회사명 / 종목코드 / 영문 ticker'}
+            <StockSearchInput
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={setQuery}
+              onPick={(r) => setQuery(r.corp_name)}
+              placeholder={mode === 'compare' ? '종목 A (이름/코드)' : '회사명 / 종목코드 / 영문 ticker'}
             />
             {mode === 'compare' && (
-              <input
-                className="search-input"
-                placeholder="종목 B"
+              <StockSearchInput
                 value={queryB}
-                onChange={(e) => setQueryB(e.target.value)}
+                onChange={setQueryB}
+                onPick={(r) => setQueryB(r.corp_name)}
+                placeholder="종목 B (이름/코드)"
                 style={{ borderLeft: '1px solid var(--line)' }}
               />
             )}
@@ -599,7 +663,7 @@ export default function AnalystScreen({ tabBar }) {
             <div className="result-foot">
               ⚠️ 위 페르소나는 AI 시뮬레이션. 단호한 톤으로 발언하지만 투자 자문 아님.
               <br />
-              {data.model} · {data.tokens.prompt + data.tokens.completion}t · DART + 네이버 + 커뮤니티 통합
+              {data.model}{data.tokens && ` · ${data.tokens.prompt + data.tokens.completion}t`} · DART + 네이버 + 커뮤니티 통합
             </div>
           </div>
         )}
