@@ -15,3 +15,4 @@ class BriefingRequest(BaseModel):
     portfolio: List[PortfolioItem]
     yesterday_hypothesis: Optional[str] = None
     today_hypothesis: Optional[str] = None
+    market: Optional[str] = "kr"  # 'kr' | 'us'

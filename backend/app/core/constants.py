@@ -46,6 +46,63 @@ SECTOR_DEFS: dict = {
 }
 
 
+US_SECTOR_DEFS: dict = {
+    "us_tech": {
+        "name": "기술주", "icon": "💻", "color": "#6366F1",
+        "ticker": "XLK",
+        "summary_query": "미국 기술주 빅테크",
+        "subtitle": "SPDR 테크놀로지 (XLK)",
+    },
+    "us_semi": {
+        "name": "반도체", "icon": "💾", "color": "#22C55E",
+        "ticker": "SOXX",
+        "summary_query": "엔비디아 미국 반도체",
+        "subtitle": "iShares 반도체 (SOXX)",
+    },
+    "us_finance": {
+        "name": "금융", "icon": "🏦", "color": "#0EA5E9",
+        "ticker": "XLF",
+        "summary_query": "미국 은행주 JP모건",
+        "subtitle": "SPDR 파이낸셜 (XLF)",
+    },
+    "us_energy": {
+        "name": "에너지", "icon": "⛽", "color": "#F97316",
+        "ticker": "XLE",
+        "summary_query": "미국 에너지 엑손모빌 셰브론",
+        "subtitle": "SPDR 에너지 (XLE)",
+    },
+    "us_health": {
+        "name": "헬스케어", "icon": "🩺", "color": "#EC4899",
+        "ticker": "XLV",
+        "summary_query": "미국 헬스케어 일라이릴리",
+        "subtitle": "SPDR 헬스케어 (XLV)",
+    },
+    "us_consumer": {
+        "name": "경기소비재", "icon": "🛒", "color": "#14B8A6",
+        "ticker": "XLY",
+        "summary_query": "테슬라 아마존 미국 소비재",
+        "subtitle": "SPDR 경기소비재 (XLY)",
+    },
+    "us_comm": {
+        "name": "커뮤니케이션", "icon": "📡", "color": "#8B5CF6",
+        "ticker": "XLC",
+        "summary_query": "구글 메타 미국 커뮤니케이션",
+        "subtitle": "SPDR 커뮤니케이션 (XLC)",
+    },
+    "us_industrial": {
+        "name": "산업재", "icon": "🏭", "color": "#64748B",
+        "ticker": "XLI",
+        "summary_query": "미국 산업재 보잉 캐터필러",
+        "subtitle": "SPDR 산업재 (XLI)",
+    },
+}
+
+
+def sector_defs_for(market: str) -> dict:
+    """market='kr' (default) → KR ETF, 'us' → SPDR US sector ETF."""
+    return US_SECTOR_DEFS if market == "us" else SECTOR_DEFS
+
+
 PERIOD_CONFIG: dict = {
     "daily":   {"period": "1mo", "interval": "1d",  "label": "최근 1개월 일봉 · 전일 대비"},
     "weekly":  {"period": "6mo", "interval": "1wk", "label": "최근 6개월 주봉 · 전주 대비"},

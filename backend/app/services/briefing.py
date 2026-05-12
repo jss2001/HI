@@ -410,3 +410,110 @@ JSON:
             "timestamp": datetime.now(KST).isoformat(),
             "portfolio": quotes, "brief": brief,
         }
+
+    async def morning_us(self, portfolio: list) -> dict:
+        """미장 장전 22:30 KST 프리뷰 — 직전 세션/오버나잇 데이터 → 오늘 미장 시나리오."""
+        if not self._llm.available:
+            return {"error": "OPENAI_API_KEY 없음"}
+
+        global_data = self.fetch_global_overnight()
+        if not global_data:
+            return {"error": "글로벌 시세를 불러오지 못했습니다"}
+
+        global_text = "\n".join(
+            f"- {name} ({d['ticker']}): {d['price']} ({d['change']:+.2f}%)"
+            if d.get("change") is not None else f"- {name}: {d['price']}"
+            for name, d in global_data.items()
+        )
+
+        user = f"""# 시각
+{datetime.now(KST).strftime('%Y-%m-%d %H:%M KST')} (오늘 미장 22:30 개장 전)
+
+# 직전 세션 + 오버나잇 스냅샷
+{global_text}
+
+지시:
+- **오늘 미장 장전 프리뷰** 작성. 22:30 개장 전 체크해야 할 것들.
+- 직전 세션 클로즈, 프리마켓 동향, 매크로 변수(달러/유가/금리), 주요 빅테크 이벤트.
+- 구체 수치 + 인과 메커니즘. 추상 표현 X.
+
+JSON:
+{{
+  "headline": "오늘 미장 한 줄 프리뷰 (구체 이벤트+숫자, 25-50자)",
+  "overseas": "**최소 5문장 (350자 이상)**. 직전 세션 종가/등락, 프리마켓, 빅테크 이벤트, 환율·유가·금리 흐름.",
+  "domestic_impact": "**최소 3문장**. 미국 시장 흐름이 한국 시장(특히 ADR/반도체/관련주)에 줄 영향.",
+  "hypothesis": "오늘 미장 가장 중요한 단일 변수 (5시 마감 시 검증 가능 형태)",
+  "checklist": [
+    "오늘 N시 확인할 변수 1 (시간+지표+임계치)",
+    "변수 2", "변수 3", "변수 4 (있으면)"
+  ]
+}}"""
+
+        brief = await self._llm.complete_json(
+            MORNING_SYSTEM, user,
+            max_tokens=self._settings.llm_max_tokens_briefing_main,
+            label="morning_us:main", temperature=0.25,
+        )
+        if not brief:
+            return {"error": "LLM 실패"}
+        brief["stock_impact"] = []
+        return {
+            "type": "morning",
+            "market": "us",
+            "timestamp": datetime.now(KST).isoformat(),
+            "global": global_data, "portfolio": [], "brief": brief,
+        }
+
+    async def evening_us(self, portfolio: list) -> dict:
+        """미장 종합 — 글로벌 인덱스/주요 빅테크 스냅샷 + LLM 코멘트."""
+        if not self._llm.available:
+            return {"error": "OPENAI_API_KEY 없음"}
+
+        global_data = self.fetch_global_overnight()
+        if not global_data:
+            return {"error": "글로벌 시세를 불러오지 못했습니다"}
+
+        global_text = "\n".join(
+            f"- {name} ({d['ticker']}): {d['price']} ({d['change']:+.2f}%)"
+            if d.get("change") is not None else f"- {name}: {d['price']}"
+            for name, d in global_data.items()
+        )
+
+        user = f"""# 시각
+{datetime.now(KST).strftime('%Y-%m-%d %H:%M KST')} (직전 미장 세션 결과 기준)
+
+# 미국 시장 스냅샷
+{global_text}
+
+지시:
+- **미국 시장 관점**의 장마감 종합 brief 작성. 한국 시장 언급 최소화.
+- 지수(S&P/Nasdaq/Dow), 빅테크(NVDA/TSM), 매크로(달러·유가·금리) 흐름과 인과.
+- 구체 수치 인용. 추상 표현 X.
+
+JSON:
+{{
+  "headline": "오늘 미장 한 줄 (구체 이벤트+숫자, 25-50자)",
+  "market_summary": "**최소 5문장 (350자 이상)**. S&P/Nasdaq/Dow, 빅테크/반도체, 환율·유가·채권, 섹터 로테이션, 한국 ADR 시사점.",
+  "key_news": [
+    "미국 핵심 뉴스/이벤트 1 (30자 이상)", "뉴스 2", "뉴스 3", "뉴스 4 (있으면)"
+  ],
+  "tomorrow_checklist": [
+    "다음 미장 N시 변수 1 (시간+지표+임계치, 30자 이상)",
+    "변수 2", "변수 3", "변수 4 (있으면)"
+  ]
+}}"""
+
+        brief = await self._llm.complete_json(
+            EVENING_SYSTEM, user,
+            max_tokens=self._settings.llm_max_tokens_briefing_main,
+            label="evening_us:main", temperature=0.3,
+        )
+        if not brief:
+            return {"error": "LLM 실패"}
+        brief["stock_results"] = []
+        return {
+            "type": "evening",
+            "market": "us",
+            "timestamp": datetime.now(KST).isoformat(),
+            "global": global_data, "portfolio": [], "brief": brief,
+        }

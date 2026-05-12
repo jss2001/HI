@@ -198,11 +198,22 @@ class AnalystService:
         self._settings = settings or get_settings()
         self._cache = TTLCache(maxsize=64, ttl=3600)
 
-    async def generate(self, company_query: str) -> Optional[dict]:
+    async def generate(self, company_query: str, market: str = "kr") -> Optional[dict]:
         if not self._llm.available:
             return {"error": "OPENAI_API_KEY 없음"}
 
         q = company_query.strip()
+
+        # US 모드 — yfinance Search로 한국어/영문명 → ticker 해석
+        if market == "us":
+            if is_global_ticker(q):
+                return await self._generate_global(q)
+            results = self._yf.search_us(q, limit=1)
+            if results:
+                return await self._generate_global(results[0]["stock_code"])
+            return {"error": f"'{company_query}' 미국 종목을 찾을 수 없습니다"}
+
+        # KR (기본) — 영문 ticker는 글로벌, 그 외 DART
         if is_global_ticker(q):
             return await self._generate_global(q)
 

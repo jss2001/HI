@@ -15,31 +15,38 @@ router = APIRouter()
 
 
 @router.get("/api/sectors")
-def list_sectors(svc: SectorService = Depends(get_sector_service)):
-    live = svc.fetch_all()
+def list_sectors(
+    market: str = "kr",
+    svc: SectorService = Depends(get_sector_service),
+):
+    live = svc.fetch_all(market=market)
     if live:
         all_sectors = [
             {"id": s["id"], "name": s["name"], "icon": s["icon"], "color": s["color"],
-             "change": s["change"], "price": s["price"], "summary": s["subtitle"]}
+             "change": s["change"], "price": s["price"], "summary": s["subtitle"],
+             "currency": s.get("currency", "KRW")}
             for s in live
         ]
         hot = sorted(all_sectors, key=lambda s: abs(s["change"]), reverse=True)[:3]
-        return {"hot": hot, "all": all_sectors, "source": "yfinance"}
+        return {"hot": hot, "all": all_sectors, "source": "yfinance", "market": market}
 
+    if market == "us":
+        return {"hot": [], "all": [], "source": "yfinance", "market": "us"}
     hot = sorted(SECTORS_MOCK, key=lambda s: abs(s["change"]), reverse=True)[:3]
-    return {"hot": hot, "all": SECTORS_MOCK, "source": "mock"}
+    return {"hot": hot, "all": SECTORS_MOCK, "source": "mock", "market": "kr"}
 
 
 @router.get("/api/sectors/{sector_id}")
 async def get_sector(
     sector_id: str,
     period: str = "daily",
+    market: str = "kr",
     svc: SectorService = Depends(get_sector_service),
     news: NewsService = Depends(get_news_service),
     refiner: KeywordRefiner = Depends(get_keyword_refiner),
     classifier: NewsClassifier = Depends(get_news_classifier),
 ):
-    sec = svc.fetch(sector_id, period_key=period)
+    sec = svc.fetch(sector_id, period_key=period, market=market)
     if sec:
         related_news = []
         sector_news_period = None

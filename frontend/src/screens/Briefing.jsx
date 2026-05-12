@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import PhoneFrame from '../components/PhoneFrame'
+import { useMarket } from '../hooks/useMarket'
 
 const PF_KEY = 'hi_portfolio'
 const HIST_KEY = 'hi_brief_history'
@@ -109,7 +110,7 @@ function PortfolioRow({ item, withWeight, onUpdate, onRemove }) {
 }
 
 
-function PortfolioInput({ portfolio, setPortfolio }) {
+function PortfolioInput({ portfolio, setPortfolio, market = 'kr' }) {
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState(null)
   const [results, setResults] = useState([])
@@ -125,6 +126,11 @@ function PortfolioInput({ portfolio, setPortfolio }) {
     setPortfolio(arr); savePF(arr)
   }
 
+  // 마켓 모드 전환 시 검색 상태 리셋 (KR/US 결과 섞임 방지)
+  useEffect(() => {
+    setQuery(''); setPicked(null); setResults([])
+  }, [market])
+
   // debounced search
   useEffect(() => {
     if (!query.trim() || picked) {
@@ -134,13 +140,13 @@ function PortfolioInput({ portfolio, setPortfolio }) {
     setSearching(true)
     const handle = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+        const r = await fetch(`/api/search?q=${encodeURIComponent(query)}&market=${market}`)
         const j = await r.json()
         setResults(j.results || [])
       } catch {} finally { setSearching(false) }
     }, 200)
     return () => clearTimeout(handle)
-  }, [query, picked])
+  }, [query, picked, market])
 
   const select = (item) => {
     setPicked(item)
@@ -159,6 +165,7 @@ function PortfolioInput({ portfolio, setPortfolio }) {
       avg_price: avgNum,
       quantity: parseInt(qty || '0', 10),
       weight: w && w > 0 ? w : null,
+      market: picked.market || market,
     }]
     setPortfolio(next); savePF(next)
     setQuery(''); setPicked(null); setAvg(''); setQty(''); setWeight('')
@@ -191,7 +198,9 @@ function PortfolioInput({ portfolio, setPortfolio }) {
         <div className="pf-search-wrap">
           <input
             className="pf-input pf-input-lg"
-            placeholder="종목 검색 (이름 또는 코드)"
+            placeholder={market === 'us'
+              ? '미국 종목 검색 (예: 엔비디아, NVDA, Tesla)'
+              : '종목 검색 (이름 또는 코드)'}
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPicked(null) }}
             onKeyDown={(e) => {
@@ -433,6 +442,7 @@ function EveningBrief({ data }) {
 }
 
 export default function Briefing({ tabBar }) {
+  const market = useMarket()
   const [portfolio, setPortfolio] = useState(loadPF)
   const [mode, setMode] = useState(() => {
     const h = new Date().getHours()
@@ -455,7 +465,9 @@ export default function Briefing({ tabBar }) {
   }, [data])
 
   const fetchBrief = async () => {
-    if (portfolio.length === 0) {
+    // 미장 evening은 포트폴리오 없이도 동작 (지수/빅테크 종합)
+    const isUSEvening = market === 'us' && mode === 'evening'
+    if (portfolio.length === 0 && !isUSEvening) {
       setError('포트폴리오를 먼저 입력해주세요')
       return
     }
@@ -470,6 +482,7 @@ export default function Briefing({ tabBar }) {
       })),
       yesterday_hypothesis: yesterday?.morning?.brief?.hypothesis || null,
       today_hypothesis: today?.morning?.brief?.hypothesis || null,
+      market,
     }
     try {
       const r = await fetch(`/api/briefing/${mode}`, {
@@ -480,10 +493,11 @@ export default function Briefing({ tabBar }) {
       const j = await r.json()
       if (j.error) throw new Error(j.error)
       setData(j)
-      // 히스토리 저장 (가설 검증용)
+      // 히스토리 저장 (가설 검증용) — KR/US 별도 슬롯
       const histNew = { ...history }
       histNew[todayKey()] = histNew[todayKey()] || {}
-      histNew[todayKey()][mode] = j
+      const slot = market === 'us' ? `${mode}_us` : mode
+      histNew[todayKey()][slot] = j
       saveHistory(histNew)
     } catch (e2) {
       setError(e2.message)
@@ -494,16 +508,18 @@ export default function Briefing({ tabBar }) {
 
   // 자동 트리거: 앱 열림 시 시간 + 포트폴리오 + 캐시 확인
   useEffect(() => {
-    if (autoTriggered || portfolio.length === 0) return
+    if (autoTriggered) return
+    const slot = market === 'us' ? `${mode}_us` : mode
+    const isUS = market === 'us'
+    if (portfolio.length === 0 && !isUS) return
     const history = loadHistory()
     const today = history[todayKey()] || {}
-    const cached = today[mode]
+    const cached = today[slot]
     if (cached) {
-      // 같은 날 같은 모드 이미 받았으면 캐시 즉시 표시
       setData(cached)
       setAutoTriggered(true)
-    } else {
-      // 시간 조건 (장전: 8시 이후 / 장마감: 16시 이후) 만족 시 자동 fetch
+    } else if (!isUS) {
+      // KR만 시간 조건 충족 시 자동 fetch (US는 버튼 수동 트리거)
       const h = new Date().getHours()
       const ready = (mode === 'morning' && h >= 8) || (mode === 'evening' && h >= 16)
       if (ready) {
@@ -511,17 +527,27 @@ export default function Briefing({ tabBar }) {
         setAutoTriggered(true)
       }
     }
-  }, [portfolio, mode, autoTriggered])
+  }, [portfolio, mode, market, autoTriggered])
 
-  // 모드 토글 시 그 모드의 캐시도 같이 로드
+  // 모드/마켓 전환 시 해당 슬롯 캐시 로드
   const switchMode = (next) => {
     setMode(next)
     setData(null)
     setError(null)
-    const history = loadHistory()
-    const cached = (history[todayKey()] || {})[next]
+    const slot = market === 'us' ? `${next}_us` : next
+    const cached = (loadHistory()[todayKey()] || {})[slot]
     if (cached) setData(cached)
   }
+
+  // 마켓 모드 전환 시에도 캐시 재로딩
+  useEffect(() => {
+    setData(null)
+    setError(null)
+    setAutoTriggered(false)
+    const slot = market === 'us' ? `${mode}_us` : mode
+    const cached = (loadHistory()[todayKey()] || {})[slot]
+    if (cached) setData(cached)
+  }, [market])
 
   // 시간이 8시/16시 도달 시 자동 트리거 (사용자 앱 열어두면 정시 발동)
   useEffect(() => {
@@ -548,7 +574,7 @@ export default function Briefing({ tabBar }) {
     <PhoneFrame tabBar={tabBar}>
       <div className="app-bar">
         <div>
-          <h1>오늘의 브리핑</h1>
+          <h1>오늘의 브리핑 <span className={`market-tag ${market === 'us' ? 'us' : 'kr'}`}>{market === 'us' ? '해외장' : '국내장'}</span></h1>
           <div className="sub">
             딸깍<span style={{ color: '#d92e2e' }}>.</span> · {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
           </div>
@@ -558,34 +584,42 @@ export default function Briefing({ tabBar }) {
       <div className="scroll">
         <div className="mode-switch" style={{ marginBottom: 12 }}>
           <button className={`mode-btn ${mode === 'morning' ? 'on' : ''}`} onClick={() => switchMode('morning')}>
-            장전 08:00
+            장전 {market === 'us' ? '22:30' : '08:00'}
           </button>
           <button className={`mode-btn ${mode === 'evening' ? 'on' : ''}`} onClick={() => switchMode('evening')}>
-            장마감 16:00
+            장마감 {market === 'us' ? '05:00' : '16:00'}
           </button>
         </div>
 
         <div className="section-title"><span>내 포트폴리오</span></div>
-        <PortfolioInput portfolio={portfolio} setPortfolio={setPortfolio} />
+        <PortfolioInput portfolio={portfolio} setPortfolio={setPortfolio} market={market} />
 
         {(() => {
           const h = new Date().getHours()
-          const ready = (mode === 'morning' && h >= 8) || (mode === 'evening' && h >= 16)
-          const targetTime = mode === 'morning' ? '08:00' : '16:00'
+          const isUS = market === 'us'
+          const krTimeLabel = mode === 'morning' ? '08:00' : '16:00'
+          const usTimeLabel = mode === 'morning' ? '22:30' : '05:00'
+          const targetTime = isUS ? usTimeLabel : krTimeLabel
+          // KR은 시간 조건 / US는 항상 ready (장이 KR 밤 시간에 열림)
+          const ready = isUS ? true : ((mode === 'morning' && h >= 8) || (mode === 'evening' && h >= 16))
+          const isUSEmpty = isUS && portfolio.length === 0  // 종목 없어도 종합 브리핑 가능
           if (loading) return <button className="brief-fetch-btn" disabled>브리핑 작성 중…</button>
-          if (data) return null  // 결과 있으면 버튼 숨김
+          if (data) return null
+          const modeLabel = mode === 'morning' ? '장전' : '장마감'
           return (
             <>
               <button
                 className="brief-fetch-btn"
                 onClick={fetchBrief}
-                disabled={portfolio.length === 0}
+                disabled={portfolio.length === 0 && !isUS}
               >
-                {ready ? `${mode === 'morning' ? '장전' : '장마감'} 브리핑 받기` : `${targetTime} 이후 자동 생성 · 미리 보기`}
+                {ready
+                  ? (isUS ? `미장 ${modeLabel} 브리핑 받기` : `${modeLabel} 브리핑 받기`)
+                  : `${targetTime} 이후 자동 생성 · 미리 보기`}
               </button>
-              {!ready && portfolio.length > 0 && (
+              {!ready && (portfolio.length > 0 || isUSEmpty) && (
                 <div className="brief-auto-note">
-                  {mode === 'morning' ? '08:00' : '16:00'}에 자동 인퍼런스됩니다. 미리 받고 싶으면 위 버튼 클릭.
+                  {targetTime}에 자동 인퍼런스됩니다. 미리 받고 싶으면 위 버튼 클릭.
                 </div>
               )}
             </>

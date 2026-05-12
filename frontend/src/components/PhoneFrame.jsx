@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { getMarket, setMarket } from '../hooks/useMarket'
 
+// ☀︎ → 라이트 테마 + KR 마켓 / ☾ → 다크 테마 + US 마켓 / ⬢ → 그린 테마(마켓 유지)
 const THEMES = [
-  { key: 'light', icon: '☀︎' },
-  { key: 'dark', icon: '☾' },
-  { key: 'green', icon: '⬢' },
+  { key: 'light', icon: '☀︎', market: 'kr', title: '국내장 · 라이트' },
+  { key: 'dark',  icon: '☾',  market: 'us', title: '미장 · 다크' },
+  { key: 'green', icon: '⬢',  market: null, title: '그린' },
 ]
 
 function StatusBar() {
@@ -34,25 +36,38 @@ function TopActions() {
     document.documentElement.getAttribute('data-theme') ||
     localStorage.getItem('hi_theme') || 'light'
   )
+  const [market, setLocalMarket] = useState(getMarket)
+
   const apply = (t) => {
     setTheme(t)
     document.documentElement.setAttribute('data-theme', t)
     localStorage.setItem('hi_theme', t)
+    const def = THEMES.find((x) => x.key === t)
+    if (def?.market) {
+      setLocalMarket(def.market)
+      setMarket(def.market)
+    }
   }
 
   return (
     <div className="top-actions">
-      <div className="theme-pill">
-        {THEMES.map((t) => (
-          <button
-            key={t.key}
-            className={`theme-btn ${theme === t.key ? 'on' : ''}`}
-            onClick={() => apply(t.key)}
-          >{t.icon}</button>
-        ))}
+      <div className="theme-pill" role="group" aria-label="테마 · 마켓 전환">
+        {THEMES.map((t) => {
+          const isThemeOn = theme === t.key
+          const isMarketOn = t.market && market === t.market
+          return (
+            <button
+              key={t.key}
+              className={`theme-btn ${isThemeOn ? 'on' : ''} ${isMarketOn && !isThemeOn ? 'market-on' : ''}`}
+              onClick={() => apply(t.key)}
+              title={t.title}
+              aria-pressed={isThemeOn}
+            >{t.icon}</button>
+          )
+        })}
       </div>
-      <button 
-        className="exchange-fab" 
+      <button
+        className="exchange-fab"
         onClick={() => window.dispatchEvent(new CustomEvent('hi-nav', { detail: { name: 'exchange' } }))}
       >
         $

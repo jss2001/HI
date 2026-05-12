@@ -13,10 +13,12 @@ export default function App() {
   const [view, setView] = useState({ name: 'home' })
   const [tab, setTab] = useState('home')
 
-  // 초기 테마 적용 (PhoneFrame이 토글 버튼 가짐)
+  // 초기 테마 + 마켓 모드 적용 (PhoneFrame이 토글 버튼 가짐)
   useEffect(() => {
-    const saved = localStorage.getItem('hi_theme') || 'light'
-    document.documentElement.setAttribute('data-theme', saved)
+    const savedTheme = localStorage.getItem('hi_theme') || 'light'
+    document.documentElement.setAttribute('data-theme', savedTheme)
+    const savedMarket = localStorage.getItem('hi_market') === 'us' ? 'us' : 'kr'
+    document.documentElement.setAttribute('data-market', savedMarket)
 
     const handleNav = (e) => setView(e.detail)
     window.addEventListener('hi-nav', handleNav)

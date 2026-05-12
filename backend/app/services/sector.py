@@ -8,8 +8,8 @@ class SectorService:
     def __init__(self, yfinance: Optional[YFinanceClient] = None):
         self._yf = yfinance or YFinanceClient()
 
-    def fetch_all(self) -> list:
-        return self._yf.fetch_all_sectors()
+    def fetch_all(self, market: str = "kr") -> list:
+        return self._yf.fetch_all_sectors(market=market)
 
-    def fetch(self, sector_id: str, period_key: str = "daily") -> Optional[dict]:
-        return self._yf.fetch_sector(sector_id, period_key)
+    def fetch(self, sector_id: str, period_key: str = "daily", market: str = "kr") -> Optional[dict]:
+        return self._yf.fetch_sector(sector_id, period_key, market=market)

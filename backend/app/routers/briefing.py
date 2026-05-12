@@ -15,6 +15,8 @@ async def briefing_morning(
     svc: BriefingService = Depends(get_briefing_service),
 ):
     portfolio = [p.model_dump() for p in req.portfolio]
+    if (req.market or "kr") == "us":
+        return await svc.morning_us(portfolio)
     return await svc.morning(portfolio, req.yesterday_hypothesis)
 
 
@@ -24,4 +26,6 @@ async def briefing_evening(
     svc: BriefingService = Depends(get_briefing_service),
 ):
     portfolio = [p.model_dump() for p in req.portfolio]
+    if (req.market or "kr") == "us":
+        return await svc.evening_us(portfolio)
     return await svc.evening(portfolio, req.today_hypothesis)

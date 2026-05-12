@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import PhoneFrame from '../components/PhoneFrame'
+import { useMarket } from '../hooks/useMarket'
 
 const THEMES_KEY = 'hi_themes'
 
@@ -58,17 +59,19 @@ function ThemeCard({ keyword, onRemove, onOpen }) {
 }
 
 export default function SectorCheck({ onOpenSector, onOpenTheme, tabBar }) {
+  const market = useMarket()
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [themes, setThemes] = useState(getThemes)
   const [newTheme, setNewTheme] = useState('')
 
   useEffect(() => {
-    fetch('/api/sectors')
+    setData(null); setError(null)
+    fetch(`/api/sectors?market=${market}`)
       .then((r) => r.json())
       .then(setData)
       .catch((e) => setError(e.message))
-  }, [])
+  }, [market])
 
   const addTheme = (e) => {
     e.preventDefault()
@@ -82,12 +85,13 @@ export default function SectorCheck({ onOpenSector, onOpenTheme, tabBar }) {
     setThemes(next); saveThemes(next)
   }
 
+  const marketLabel = market === 'us' ? '미국장' : '국내장'
   return (
     <PhoneFrame tabBar={tabBar}>
       <div className="app-bar">
         <div>
-          <h1>섹터체크</h1>
-          <div className="sub">오늘의 시장 흐름</div>
+          <h1>섹터체크 <span className={`market-tag ${market === 'us' ? 'us' : 'kr'}`}>{marketLabel}</span></h1>
+          <div className="sub">{marketLabel} · 오늘의 시장 흐름</div>
         </div>
       </div>
 

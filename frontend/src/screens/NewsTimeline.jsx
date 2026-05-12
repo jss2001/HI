@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import PhoneFrame from '../components/PhoneFrame'
+import { useMarket } from '../hooks/useMarket'
 
 const THEMES_KEY = 'hi_themes'
 function getCustomThemes() {
@@ -7,6 +8,7 @@ function getCustomThemes() {
 }
 
 export default function NewsTimeline({ tabBar, initialTag }) {
+  const market = useMarket()
   const [data, setData] = useState(null)
   const [tag, setTag] = useState(initialTag || '전체')
   const [customTags] = useState(getCustomThemes)
@@ -15,17 +17,26 @@ export default function NewsTimeline({ tabBar, initialTag }) {
     if (initialTag) setTag(initialTag)
   }, [initialTag])
 
+  // 마켓 모드 전환 시 태그를 '전체'로 리셋 (KR/US 태그 셋이 다름)
   useEffect(() => {
-    const url = tag === '전체' ? '/api/news' : `/api/news?tag=${encodeURIComponent(tag)}`
-    fetch(url).then((r) => r.json()).then(setData)
-  }, [tag])
+    setTag('전체')
+  }, [market])
 
+  useEffect(() => {
+    const params = new URLSearchParams()
+    params.set('market', market)
+    if (tag !== '전체') params.set('tag', tag)
+    const url = `/api/news?${params.toString()}`
+    fetch(url).then((r) => r.json()).then(setData)
+  }, [tag, market])
+
+  const marketLabel = market === 'us' ? '미국장' : '국내장'
   return (
     <PhoneFrame tabBar={tabBar}>
       <div className="app-bar">
         <div>
-          <h1>뉴스 · 타임라인</h1>
-          <div className="sub">테마별 시장 뉴스</div>
+          <h1>뉴스 · 타임라인 <span className={`market-tag ${market === 'us' ? 'us' : 'kr'}`}>{marketLabel}</span></h1>
+          <div className="sub">{marketLabel} 관련 기사</div>
         </div>
       </div>
 

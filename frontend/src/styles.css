@@ -1273,15 +1273,18 @@ html, body, #root {
   border-radius: 14px;
   padding: 6px;
 }
-.search-suggest-wrap { position: relative; flex: 1; display: flex; }
+.search-suggest-wrap { position: relative; flex: 1; display: flex; min-width: 0; }
 .search-input {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   border: 0;
   background: transparent;
   font-size: 13px;
   padding: 6px 8px;
   outline: none;
   color: var(--text);
+  text-overflow: ellipsis;
 }
 .search-suggest {
   position: absolute;
@@ -2533,6 +2536,39 @@ html, body, #root {
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
 }
+
+/* 국내장 / 미국장 라벨 (앱바 헤더에 표시) */
+.market-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  vertical-align: middle;
+  letter-spacing: -0.2px;
+}
+.market-tag.kr {
+  background: rgba(13, 110, 253, 0.12);
+  color: #0d6efd;
+}
+.market-tag.us {
+  background: rgba(217, 46, 46, 0.12);
+  color: #d92e2e;
+}
+
+/* ☀︎/☾ 버튼이 마켓 모드 결정 (light=KR, dark=US, green=마켓 유지).
+   현재 마켓이 매핑되어 있고 테마는 다를 때 점으로 표기. */
+.theme-btn.market-on::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--accent, #d92e2e);
+}
+.theme-btn { position: relative; }
 
 .exchange-fab {
   width: 32px;

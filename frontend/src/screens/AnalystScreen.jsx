@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import PhoneFrame from '../components/PhoneFrame'
+import { useMarket } from '../hooks/useMarket'
 
-const QUICK_PICKS = ['삼성전자', 'SK하이닉스', 'LG에너지솔루션', '셀트리온', '현대차']
-const COMPARE_PICKS = [['삼성전자', 'SK하이닉스'], ['현대차', '기아'], ['NAVER', '카카오']]
+const QUICK_PICKS_KR = ['삼성전자', 'SK하이닉스', 'LG에너지솔루션', '셀트리온', '현대차']
+const QUICK_PICKS_US = ['NVDA', 'TSLA', 'AAPL', 'MSFT', 'GOOGL']
+const COMPARE_PICKS_KR = [['삼성전자', 'SK하이닉스'], ['현대차', '기아'], ['NAVER', '카카오']]
+const COMPARE_PICKS_US = [['NVDA', 'AMD'], ['TSLA', 'RIVN'], ['META', 'GOOGL']]
 
 const VERDICT_STYLE = {
   BULL_WINS: { label: '강세 우세', emoji: '🐂', color: '#dc2626' },
@@ -55,7 +58,7 @@ const PERSONA = {
   },
 }
 
-function StockSearchInput({ value, onChange, onPick, placeholder, style }) {
+function StockSearchInput({ value, onChange, onPick, placeholder, style, market = 'kr' }) {
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [open, setOpen] = useState(false)
@@ -67,13 +70,13 @@ function StockSearchInput({ value, onChange, onPick, placeholder, style }) {
     setSearching(true)
     const h = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+        const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&market=${market}`)
         const j = await r.json()
         setResults(j.results || [])
       } catch {} finally { setSearching(false) }
     }, 200)
     return () => clearTimeout(h)
-  }, [value])
+  }, [value, market])
 
   return (
     <div className="search-suggest-wrap" style={style}>
@@ -230,6 +233,7 @@ function QuotedPost({ q, side }) {
 }
 
 export default function AnalystScreen({ tabBar }) {
+  const market = useMarket()
   const [mode, setMode] = useState('single')
   const [query, setQuery] = useState('')
   const [queryB, setQueryB] = useState('')
@@ -240,8 +244,15 @@ export default function AnalystScreen({ tabBar }) {
   const [showSources, setShowSources] = useState(false)
   const [phaseText, setPhaseText] = useState('')
   const phaseTimer = useRef(null)
+  const QUICK_PICKS = market === 'us' ? QUICK_PICKS_US : QUICK_PICKS_KR
+  const COMPARE_PICKS = market === 'us' ? COMPARE_PICKS_US : COMPARE_PICKS_KR
 
   useEffect(() => () => clearTimeout(phaseTimer.current), [])
+
+  // 마켓 모드 전환 시 상태 리셋 (KR/US 결과 혼선 방지)
+  useEffect(() => {
+    setQuery(''); setQueryB(''); setData(null); setCompareData(null); setError(null); setShowSources(false)
+  }, [market])
 
   const fetchBrief = async (company) => {
     setLoading(true); setError(null); setData(null); setCompareData(null); setShowSources(false)
@@ -253,7 +264,7 @@ export default function AnalystScreen({ tabBar }) {
     }
     phaseTimer.current = setTimeout(tick, 1400)
     try {
-      const r = await fetch(`/api/analyst?company=${encodeURIComponent(company)}`)
+      const r = await fetch(`/api/analyst?company=${encodeURIComponent(company)}&market=${market}`)
       if (!r.ok) {
         const j = await r.json().catch(() => ({}))
         throw new Error(j.detail || '분석 실패')
@@ -267,7 +278,7 @@ export default function AnalystScreen({ tabBar }) {
     setLoading(true); setError(null); setData(null); setCompareData(null); setShowSources(false)
     setPhaseText(`${aName} vs ${bName} 동시 분석…`)
     try {
-      const r = await fetch(`/api/compare?a=${encodeURIComponent(aName)}&b=${encodeURIComponent(bName)}`)
+      const r = await fetch(`/api/compare?a=${encodeURIComponent(aName)}&b=${encodeURIComponent(bName)}&market=${market}`)
       if (!r.ok) {
         const j = await r.json().catch(() => ({}))
         throw new Error(j.detail || '비교 실패')
@@ -292,12 +303,17 @@ export default function AnalystScreen({ tabBar }) {
 
   const verdict = data?.brief?.judge ? (VERDICT_STYLE[data.brief.judge.verdict] || VERDICT_STYLE.TIE) : null
 
+  const marketLabel = market === 'us' ? '미국장' : '국내장'
+  const placeholderA = mode === 'compare'
+    ? (market === 'us' ? '종목 A (NVDA, ...)' : '종목 A (이름/코드)')
+    : (market === 'us' ? '미국 종목 (예: NVDA, 엔비디아)' : '회사명 / 종목코드 / 영문 ticker')
+  const placeholderB = market === 'us' ? '종목 B (GOOGL, ...)' : '종목 B (이름/코드)'
   return (
     <PhoneFrame tabBar={tabBar}>
       <div className="app-bar">
         <div>
-          <h1>종목 분석</h1>
-          <div className="sub">Bull · Bear · Judge 페르소나 종합 분석</div>
+          <h1>종목 분석 <span className={`market-tag ${market === 'us' ? 'us' : 'kr'}`}>{marketLabel}</span></h1>
+          <div className="sub">{marketLabel} · Bull · Bear · Judge 페르소나 종합 분석</div>
         </div>
       </div>
 
@@ -312,16 +328,18 @@ export default function AnalystScreen({ tabBar }) {
             <StockSearchInput
               value={query}
               onChange={setQuery}
-              onPick={(r) => setQuery(r.corp_name)}
-              placeholder={mode === 'compare' ? '종목 A (이름/코드)' : '회사명 / 종목코드 / 영문 ticker'}
+              onPick={(r) => setQuery(r.market === 'us' ? r.stock_code : r.corp_name)}
+              placeholder={placeholderA}
+              market={market}
             />
             {mode === 'compare' && (
               <StockSearchInput
                 value={queryB}
                 onChange={setQueryB}
-                onPick={(r) => setQueryB(r.corp_name)}
-                placeholder="종목 B (이름/코드)"
+                onPick={(r) => setQueryB(r.market === 'us' ? r.stock_code : r.corp_name)}
+                placeholder={placeholderB}
                 style={{ borderLeft: '1px solid var(--line)' }}
+                market={market}
               />
             )}
             <button className="search-btn" type="submit">{mode === 'compare' ? '비교' : '분석'}</button>
