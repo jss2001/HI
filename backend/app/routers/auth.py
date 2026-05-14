@@ -8,8 +8,8 @@ from app.config import get_settings
 router = APIRouter()
 
 
-@router.get("/")
-def root():
+@router.get("/api/health")
+def health():
     return {"service": "HI", "ok": True}
 
 

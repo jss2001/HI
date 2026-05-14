@@ -1,0 +1,11 @@
+**/node_modules
+**/__pycache__
+**/.venv
+**/.env
+**/.env.local
+**/dist
+**/.git
+**/.claude
+**/.vercel
+.DS_Store
+*.log
